@@ -321,7 +321,15 @@ class OneClick():
         cmd = f"python -m pip install -r {requirements_file}"
         cmd = cmd + " --upgrade" if is_update else cmd
         cls.oc_run_cmd(cmd, assert_success=True, environment=True, env=build_env)
-        
+
+        # whisperx==3.3.1 pins ctranslate2<4.5.0, but 4.4.x links against the old
+        # cuDNN 8 (libcudnn_ops_infer.so.8) while torch 2.5.1+cu124 ships cuDNN 9,
+        # so GPU inference crashes with "Could not load library libcudnn_ops_infer.so.8".
+        # ctranslate2 4.5.0 links against cuDNN 9 and stays compatible with whisperx,
+        # so force-upgrade it with --no-deps (avoids whisperx's hard pin failing pip).
+        if not cls.is_macos() and selected_gpu == 'NVIDIA':
+            cls.oc_run_cmd("python -m pip install --no-deps ctranslate2==4.5.0", assert_success=True, environment=True)
+
         # Install PyTorch via pip for non-macOS systems (CPU builds)
         # On macOS, PyTorch is installed via conda in install_conda_packages
         if not cls.is_macos() and selected_gpu == 'CPU':

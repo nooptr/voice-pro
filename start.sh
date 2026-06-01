@@ -69,6 +69,10 @@ INSTALL_ENV_DIR="$INSTALL_DIR/env"
 export TMP="$INSTALL_DIR"
 export TEMP="$INSTALL_DIR"
 
+# Force a headless matplotlib backend (Colab/Jupyter sets MPLBACKEND to an
+# inline backend that isn't installed in this conda env)
+export MPLBACKEND=Agg
+
 # Determine platform
 if [[ "$OSTYPE" == "darwin"* ]]; then
     # macOS
@@ -403,6 +407,13 @@ cd "$SCRIPT_DIR"
 if [ "$ABUS_GENUINE_INSTALLED" == "F" ]; then
     python -m pip install huggingface-hub==0.27.1
 fi
+
+# Put the pip-installed NVIDIA libs (cuDNN, cuBLAS) on the loader path so
+# CTranslate2/faster-whisper can dlopen libcudnn_cnn.so.9 etc. at runtime.
+# Without this, GPU inference aborts with:
+#   "Unable to load any of {libcudnn_cnn.so.9 ...}"
+NVIDIA_LIB_DIRS=$(find "$INSTALL_ENV_DIR/lib" -type d -path "*/site-packages/nvidia/*/lib" 2>/dev/null | tr '\n' ':')
+export LD_LIBRARY_PATH="$NVIDIA_LIB_DIRS$LD_LIBRARY_PATH"
 
 export LOG_LEVEL=DEBUG
 python start-abus.py voice
