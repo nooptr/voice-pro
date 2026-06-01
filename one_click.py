@@ -309,9 +309,18 @@ class OneClick():
         requirements_file = f'requirements-{app_name}-gpu.txt' if selected_gpu=="NVIDIA" else f'requirements-{app_name}-cpu.txt'
         cls.oc_print_big_message(f"Install/Update webui requirements from file: {requirements_file}")
         
+        # setuptools >= 81 removed pkg_resources, which breaks the legacy setup.py
+        # of some dependencies during pip's build-isolation step. pip propagates the
+        # PIP_CONSTRAINT env var into build-isolation subprocesses, so pin setuptools
+        # to a version that still ships pkg_resources for any from-source wheel builds.
+        constraints_path = os.path.join(cls.script_dir, "build-constraints.txt")
+        with open(constraints_path, "w") as f:
+            f.write("setuptools<80\n")
+        build_env = dict(os.environ, PIP_CONSTRAINT=constraints_path)
+
         cmd = f"python -m pip install -r {requirements_file}"
         cmd = cmd + " --upgrade" if is_update else cmd
-        cls.oc_run_cmd(cmd, assert_success=True, environment=True)
+        cls.oc_run_cmd(cmd, assert_success=True, environment=True, env=build_env)
         
         # Install PyTorch via pip for non-macOS systems (CPU builds)
         # On macOS, PyTorch is installed via conda in install_conda_packages
